@@ -4,20 +4,20 @@ SwiftDeploy is a simple DevOps automation tool that manages application deployme
 
 # It uses:
 
-1. Docker Compose for container orchestration
-2. Nginx as a reverse proxy
-3. A Python CLI for deployment automation
-4. A Flask API that supports stable, canary, and chaos modes
-   SWIFTDEPLOY IS DESIGNED FOR FAST, LOCAL, REPRODUCIBLE DEPLOYMENTS WITH ZERO DOWNTIME DURING MODE PROMOTION.
+- Docker Compose for container orchestration
+- Nginx as a reverse proxy
+- A Python CLI for deployment automation
+- A Flask API that supports stable, canary, and chaos modes
+  -SWIFTDEPLOY IS DESIGNED FOR FAST, LOCAL, REPRODUCIBLE DEPLOYMENTS WITH ZERO DOWNTIME DURING MODE PROMOTION.
 
 # Features
 
-I. Automatic config generation (docker-compose.yml, nginx.conf)
-II. Stable to Canary(and vice-versa) promotion with health verification
-III. Chaos testing (slow, error, recover)
-IV. Zero downtime container restart
-V. Nginx reverse proxy with custom headers
-VI. Health endpoint with uptime + mode reporting
+- Automatic config generation (docker-compose.yml, nginx.conf)
+- Stable to Canary(and vice-versa) promotion with health verification
+- Chaos testing (slow, error, recover)
+- Zero downtime container restart
+- Nginx reverse proxy with custom headers
+- Health endpoint with uptime + mode reporting
 
 # Installation & Setup
 
@@ -26,82 +26,79 @@ Follow these steps to set up SwiftDeploy on your machine.
 # 1. Clone the Repository
 
 - Get the project files onto your machine.
-  Run:
-  git clone <https://github.com/Godwin-Techie/SwiftDeploy.git>
-  Enter the folder:
-  cd swiftdeploy
+  - Run:
+  - git clone <https://github.com/Godwin-Techie/SwiftDeploy.git>
+  - Enter the folder:
+  - cd swiftdeploy
 
 # 2. Install Python Dependencies
 
 The CLI and API require Python packages.
 
 - pip install -r requirements.txt
-  This ensure Python 3.10+ is installed
-  This installs Flask, PyYAML, Requests, etc.
+  - This ensure Python 3.10+ is installed
+  - This installs Flask, PyYAML, Requests, etc.
 
 # 3. Install Docker & Docker Compose
 
 - SwiftDeploy uses Docker Compose to orchestrate containers.
-  Install Docker Desktop or Docker Engine
-  Confirm installation with: docker --version
+  - Install Docker Desktop or Docker Engine
+  - Confirm installation with: docker --version
 
 # 4. Create Your Manifest File
 
 - The manifest controls deployment mode and ports.
-  Create manifest.yml
-  •Example:
-  mode: stable
-  nginx:
-  port: 8080
-  app:
-  port: 5000
+  - Create manifest.yml
+    - •Example:
+    - mode: stable
+    - nginx:
+    - port: 8080
+    - app:
+    - port: 5000
 
 # 5. Generate Config Files
 
 - SwiftDeploy generates docker-compose.yml and nginx.conf automatically.
-  swiftdeploy generate
-  This reads manifest.yml
-  Produces docker-compose.yml
-  Produces nginx.conf
+  - swiftdeploy generate
+  - This reads manifest.yml
+  - Produces docker-compose.yml
+  - Produces nginx.conf
 
 # 6. Deploy the Application
 
 - Start the containers and wait for health checks.
-  swiftdeploy deploy
-  Builds and starts containers
-  Waits for /healthz to return healthy
-  Confirms mode is active
+  - swiftdeploy deploy
+  - Builds and starts containers
+  - Waits for /healthz to return healthy
+  - Confirms mode is active
 
 # CLI Subcommands Walkthrough
 
 - SwiftDeploy includes several CLI commands.
 
 1.  # swiftdeploy init
-
-    Generates:
-    docker-compose.yml
-    nginx.conf
-    Based on manifest.yml.
+    - Generates:
+    - docker-compose.yml
+    - nginx.conf
+    - Based on manifest.yml.
 
 2.  # swiftdeploy validate
-
-    validates:
-    docker-compose.yml
-    nginx.conf
-    Based on manifest.yml.
+    - validates:
+    - docker-compose.yml
+    - nginx.conf
+    - Based on manifest.yml.
 
 3.  # swiftdeploy deploy
-
-    Builds and starts the entire stack.
-    Starts Nginx + App
-    Waits for /healthz
-    Confirms mode (stable/canary)
+    - Builds and starts the entire stack.
+    - Starts Nginx + App
+    - Waits for /healthz
+    - Confirms mode (stable/canary)
 
 4.  # swiftdeploy promote
     Switches between:
-    from stable mode to canary mode
-    from stable mode to canary mode
-    Then:
+    - from stable mode to canary mode
+    - from stable mode to canary mode
+    - Then:
     - Saves manifest
     - Regenerates configs
     - Restarts ONLY the app container
@@ -111,28 +108,22 @@ The CLI and API require Python packages.
 # Testing Canary Mode
 
 - curl -I http://localhost:8080/
-  you should see:
-  X-Mode: canary
-  X-Deployed-By: swiftdeploy
+  - you should see:
+  - X-Mode: canary
+  - X-Deployed-By: swiftdeploy
 
 # Chaos Testing
 
 Chaos mode is only active in canary.
 
-- To enable slow mode run:
-  curl -X POST http://localhost:8080/chaos \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"slow","duration":5}'
+- Enable slow mode run:
+- curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"slow","duration":5}'
 
-- Enable error mode
-  curl -X POST http://localhost:8080/chaos \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"error","rate":0.5}'
+- Enable error mode run:
+  curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"error","rate":0.5}'
 
-- Recover
-  curl -X POST http://localhost:8080/chaos \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"recover"}'
+- Recover mode run:
+  curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"recover"}'
 
 # Health Endpoint
 
