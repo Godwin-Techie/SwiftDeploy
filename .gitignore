@@ -1,0 +1,6 @@
+./cli/__pycache__/
+__pycache__/
+*.egg-info/
+docker-compose.yml
+nginx.conf
+/data/

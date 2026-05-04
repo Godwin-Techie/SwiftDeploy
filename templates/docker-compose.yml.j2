@@ -1,0 +1,78 @@
+services:
+  app:
+    # Set the application container image from manifest data
+    image: {{ services.image }}
+
+    # Inject environment variables for application configuration
+    environment:
+      MODE: {{ mode }}
+      APP_VERSION: {{ app_version }}
+      APP_PORT: {{ services.port }}
+
+      # Loop through and apply custom environment variables
+      {% for key, value in env.items() %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+
+    # Run as a non-root user for security hardening
+    user: "1000:1000"
+
+    # Remove all default kernel capabilities to minimize attack surface
+    cap_drop:
+      - ALL
+
+    # Attach to the defined project-specific network
+    networks:
+      - {{ network.name }}
+
+    # Mount logs, persistent data, and health check script
+    volumes:
+      - logs:/var/log/app
+      - ./data:/app/data
+      - ./app/healthcheck.py:/app/healthcheck.py:ro
+
+    # Define the internal health monitoring logic and thresholds
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/python", "/app/healthcheck.py"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    # Ensure container persistence unless manually shut down
+    restart: unless-stopped
+
+
+  nginx:
+    # Set the reverse proxy/load balancer image
+    image: {{ nginx.image }}
+    container_name: swiftdeploy-nginx
+
+    # Map the host port to the container port for external access
+    ports:
+      - "{{ nginx.port }}:{{ nginx.port }}"
+
+    # Mount the generated Nginx configuration and log volume
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - logs:/var/log/nginx
+
+    # Ensure the application container starts before the proxy
+    depends_on:
+      - app
+
+    # Attach proxy to the same network as the application
+    networks:
+      - {{ network.name }}
+
+    restart: unless-stopped
+
+
+networks:
+  # Define the driver type for service communication
+  {{ network.name }}:
+    driver: {{ network.driver_type }}
+
+volumes:
+  # Named volume for centralized log storage
+  logs:

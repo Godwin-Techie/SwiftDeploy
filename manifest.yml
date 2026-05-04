@@ -1,0 +1,19 @@
+mode: stable
+network:
+  driver_type: bridge
+  name: swiftdeploy-net
+nginx:
+  image: nginx:latest
+  port: 8080
+  routes:
+  - path: /
+    port: 3000
+    service: services
+services:
+  env:
+    LOG_LEVEL: info
+    NODE_ENV: production
+  image: swift-deploy-1-node:latest
+  port: 3000
+  volumes:
+  - ./data:/app/data

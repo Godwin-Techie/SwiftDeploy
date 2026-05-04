@@ -1,0 +1,68 @@
+# Automatically set worker processes based on available CPU cores
+worker_processes auto;
+
+events {
+    # Maximum number of simultaneous connections per worker
+    worker_connections 1024;
+}
+
+http {
+    # Define DNS resolver for dynamic upstream resolution
+    resolver 8.8.8.8 ipv6=off;
+    
+    # Configure file type mappings and default response format
+    include       mime.types;
+    default_type  application/json;
+
+    # Define custom log format for structured performance monitoring
+    log_format swiftdeploy '$time_iso8601 | $status | ${request_time}s | $upstream_addr | $request';
+
+    # Set paths for access and error logs
+    access_log /var/log/nginx/access.log swiftdeploy;
+    error_log  /var/log/nginx/error.log;
+
+    server {
+        # Bind to the port specified in the manifest
+        listen {{ nginx.port }};
+        server_name _;
+
+        # Custom header to identify the deployment orchestrator
+        add_header X-Deployed-By "swiftdeploy";
+
+        location / {
+            # Route traffic to the internal application service
+            proxy_pass http://app:{{ services.port }};
+            
+            # Pass client identification headers to the upstream
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Define network connection and processing timeouts
+            proxy_connect_timeout 5s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
+        }
+
+        # Map standard server errors to custom JSON response locations
+        error_page 502 /custom_502.json;
+        error_page 503 /custom_503.json;
+        error_page 504 /custom_504.json;
+
+        # Return structured JSON error for upstream connection failures
+        location = /custom_502.json {
+            return 502 '{"error":"Bad Gateway","code":502,"service":"app","contact":"devops"}';
+        }
+
+        # Return structured JSON error for service overload/maintenance
+        location = /custom_503.json {
+            return 503 '{"error":"Service Unavailable","code":503,"service":"app","contact":"devops"}';
+        }
+
+        # Return structured JSON error for request processing timeouts
+        location = /custom_504.json {
+            return 504 '{"error":"Gateway Timeout","code":504,"service":"app","contact":"devops"}';
+        }
+    }
+}

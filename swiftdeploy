@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import sys
+from cli.commands.init import run_generate
+from cli.commands.validate import run_validate
+from cli.commands.up import run_up
+from cli.commands.down import run_down
+from cli.commands.promote import run_promote
+from cli.commands.chaos import run_chaos
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: swiftdeploy <command>")
+        print("Commands: init, validate, deploy, teardown, promote, chaos")
+        return
+
+    command = sys.argv[1]
+
+    if command == "init":
+        run_generate()
+    elif command == "validate":
+        run_validate()
+    elif command == "deploy":
+        run_up()
+    elif command == "teardown":
+        run_down()
+    elif command == "promote":
+        run_promote()
+    else:
+        print(f"Unknown command: {command}")
+        print("Available commands: init, validate, deploy, teardown, promote,")
+
+if __name__ == "__main__":
+    main()
