@@ -33,7 +33,7 @@ def run_down():
             if os.path.exists(file):
                 try:
                     os.remove(file)
-                    print(f"✔ Removed {file}")
+                    print(f"Removed {file}")
                 except Exception as e:
                     print(f"Failed to remove {file}: {e}")
 
@@ -41,7 +41,7 @@ def run_down():
         if os.path.exists("logs"):
             try:
                 shutil.rmtree("logs")
-                print("✔ Removed logs directory")
+                print("Removed logs directory")
             except Exception as e:
                 print(f"Failed to remove logs directory: {e}")
 
