@@ -5,8 +5,7 @@ from datetime import datetime
 import random
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from flask import g
-import shutil  
-import os     
+import shutil 
 
 # Counter: total requests
 REQUEST_COUNT = Counter(

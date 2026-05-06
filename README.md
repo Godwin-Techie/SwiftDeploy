@@ -1,23 +1,65 @@
-# SwiftDeploy – Lightweight Deployment & Canary Release Tool
+# SwiftDeploy – Lightweight Deployment, Canary & Policy-Gated Release Tool
 
-SwiftDeploy is a simple DevOps automation tool that manages application deployment, canary releases, configuration generation, and chaos testing.
+SSwiftDeploy is a DevOps automation tool that manages application deployment, canary releases, configuration generation, chaos testing, and policy-based safety enforcement.
+It is designed for fast, local, reproducible deployments with zero downtime and built-in safety guardrails.
 
-# It uses:
+# Core Stack:
 
-- Docker Compose for container orchestration
-- Nginx as a reverse proxy
-- A Python CLI for deployment automation
-- A Flask API that supports stable, canary, and chaos modes
-  -SWIFTDEPLOY IS DESIGNED FOR FAST, LOCAL, REPRODUCIBLE DEPLOYMENTS WITH ZERO DOWNTIME DURING MODE PROMOTION.
+- Docker Compose (container orchestration)
+- Nginx (reverse proxy)
+- Python CLI (deployment automation)
+- Flask API (application service)
+- Open Policy Agent (OPA) (policy engine)
+- Prometheus-style metrics (/metrics endpoint)
 
-# Features
+# Key Features
+
+# Deployment & Traffic Control
 
 - Automatic config generation (docker-compose.yml, nginx.conf)
-- Stable to Canary(and vice-versa) promotion with health verification
-- Chaos testing (slow, error, recover)
-- Zero downtime container restart
+- Stable ↔ Canary promotion with health verification
+- Zero-downtime container restarts
 - Nginx reverse proxy with custom headers
-- Health endpoint with uptime + mode reporting
+
+# Chaos Engineering
+
+- Inject slow, error, and recovery states
+- Test system resilience in real-time
+
+# Observability ("The Eyes")
+
+- /metrics endpoint (Prometheus format)
+  -Tracks:
+  - Request throughput & errors
+  - Latency (histogram)
+  - App state (mode, uptime, chaos)
+
+# Policy Engine ("The Brain")
+
+- Open Policy Agent (OPA) sidecar
+- Deployment decisions are NOT made in CLI
+- All allow/deny logic lives in Rego policies
+
+# Policy-Gated Deployments
+
+- Pre-deploy checks
+  - CPU, Memory, Disk validation
+- Pre-promote checks
+  - Error rate
+  - P99 latency
+- Deployments are blocked automatically if unsafe
+
+# Observability CLI
+
+- swiftdeploy status
+  - Live metrics dashboard
+  - Policy compliance view
+  - Tracks req/sec + latency
+- Audit System ("The Memory")
+- Logs all events to history.jsonl
+  - swiftdeploy audit generates:
+  - Timeline of deployments & chaos events
+  - Policy violations report
 
 # Installation & Setup
 
@@ -56,83 +98,105 @@ The CLI and API require Python packages.
     - app:
     - port: 5000
 
-# 5. Generate Config Files
+# 5. Initialize Project
 
-- SwiftDeploy generates docker-compose.yml and nginx.conf automatically.
-  - swiftdeploy generate
-  - This reads manifest.yml
-  - Produces docker-compose.yml
-  - Produces nginx.conf
+- swiftdeploy init
+  - Generates:
+    - docker-compose.yml
+    - nginx.conf
+    - OPA configuration
+    - policies/ directory
+    - This reads manifest.yml
 
 # 6. Deploy the Application
 
-- Start the containers and wait for health checks.
-  - swiftdeploy deploy
-  - Builds and starts containers
-  - Waits for /healthz to return healthy
-  - Confirms mode is active
+- swiftdeploy deploy
+  - What happens:
+    - Collect system metrics (CPU, disk, memory)
+    - Send to OPA (pre-deploy)
+    - OPA evaluates policies
+    - Deploy OR Block with reason
 
-# CLI Subcommands Walkthrough
+# Decision Model
 
-- SwiftDeploy includes several CLI commands.
+- CLI → sends input to OPA
+- OPA → returns structured decision:
+- {
+  - "allow": false,
+  - "reason": "Disk space below 10GB"
+- }
+- CLI must NOT override decisions
 
-1.  # swiftdeploy init
-    - Generates:
-    - docker-compose.yml
-    - nginx.conf
-    - Based on manifest.yml.
+# Metrics Endpoint
 
-2.  # swiftdeploy validate
-    - validates:
-    - docker-compose.yml
-    - nginx.conf
-    - Based on manifest.yml.
+- http://localhost:8080/metrics
+  - Tracks:
+- Throughput - http_requests_total{method, path, status_code}
+- Latency - http_request_duration_seconds (histogram)
+- State - app_uptime_seconds - app_mode (0=stable, 1=canary) - chaos_active (0=none, 1=slow, 2=error)
 
-3.  # swiftdeploy deploy
-    - Builds and starts the entire stack.
-    - Starts Nginx + App
-    - Waits for /healthz
-    - Confirms mode (stable/canary)
+# Promotion (Policy-Gated)
 
-4.  # swiftdeploy promote
-    Switches between:
-    - from stable mode to canary mode
-    - from stable mode to canary mode
-    - Then:
-    - Saves manifest
-    - Regenerates configs
-    - Restarts ONLY the app container
-    - Waits for health
-    - Confirms new mode
+- swiftdeploy promote
+  - What happens:
+    - Scrape /metrics
+    - Compute:
+    - Error rate
+    - P99 latency
+    - Send to OPA (pre-promote)
+    - Promote OR Block
+
+# Chaos Testing
+
+- Only active in canary mode.
+- Slow Mode:
+- curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d {"mode":"slow","duration":5}'
+- Error Mode:
+- curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"error","rate":0.5}'
+- Recover:
+- curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"recover"}'
+
+# Status Dashboard
+
+- swiftdeploy status
+- Displays:
+  - Live req/sec
+  - P99 latency
+  - Current mode
+  - Policy compliance (PASS/FAIL)
+
+# Audit Report
+
+- swiftdeploy audit
+- Generates:
+  - audit_report.md
+  - Includes:
+  - Deployment timeline
+  - Chaos events
+  - Policy violations
 
 # Testing Canary Mode
 
 - curl -I http://localhost:8080/
-  - you should see:
-  - X-Mode: canary
-  - X-Deployed-By: swiftdeploy
+  - Headers:
+    - X-Mode: canary
+    - X-Deployed-By: swiftdeploy
 
-# Chaos Testing
+# Design Philosophy
 
-Chaos mode is only active in canary.
+- Separation of Concerns
+  - CLI → execution only
+  - OPA → decision making
+- Safety First
+  - No deployment without validation
+  - Canary must prove itself before promotion
+- Observability-Driven
+  - Metrics power decisions
+  - Everything is measurable
 
-- Enable slow mode run:
-- curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"slow","duration":5}'
+# Bring everything down
 
-- Enable error mode run:
-  curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"error","rate":0.5}'
-
-- Recover mode run:
-  curl -X POST http://localhost:8080/chaos \ -H "Content-Type: application/json" \ -d '{"mode":"recover"}'
-
-# Health Endpoint
-
-- Run:
-  http://localhost:8080/healthz
-
-- Return:
-  {
-  "status": "healthy",
-  "uptime_seconds": 123,
-  "mode": "canary"
-  }
+- swiftdeploy teardown
+- Removes all containers
+- networks and volumes
+- clean deletes generated configs
