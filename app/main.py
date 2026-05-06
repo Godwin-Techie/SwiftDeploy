@@ -3,6 +3,29 @@ import os
 import time
 from datetime import datetime
 import random
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from flask import g
+import shutil  
+import os     
+
+# Counter: total requests
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status_code"]
+)
+
+# Histogram: request latency
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "Request latency in seconds",
+    ["method", "path"]
+)
+
+# Gauges: uptime, mode, chaos
+APP_UPTIME = Gauge("app_uptime_seconds", "Application uptime in seconds")
+APP_MODE = Gauge("app_mode", "0=stable, 1=canary")
+CHAOS_ACTIVE = Gauge("chaos_active", "0=none, 1=slow, 2=error")
 
 app = Flask(__name__)
 
@@ -16,19 +39,46 @@ chaos_state = {
     "rate": 0
 }
 
+current_mode = os.getenv("MODE", "stable")
+APP_MODE.set(1 if current_mode == "canary" else 0)
+
+@app.before_request
+def start_timer():
+    g.start_time = time.time()
+
+@app.after_request
+def record_metrics(response):
+    latency = time.time() - g.start_time
+
+    REQUEST_LATENCY.labels(
+        request.method,
+        request.path
+    ).observe(latency)
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        path=request.path,
+        status_code=response.status_code
+    ).inc()
+
+    APP_UPTIME.set(int(time.time() - start_time))
+    APP_MODE.set(1 if os.getenv("MODE") == "canary" else 0)
+
+    chaos_map = {"none": 0, None: 0, "slow": 1, "error": 2}
+    CHAOS_ACTIVE.set(chaos_map.get(chaos_state["mode"], 0))
+
+    return response
+
 
 @app.route("/")
 def home():
-    # Load environment configuration
     mode = os.getenv("MODE", "stable")
     version = os.getenv("APP_VERSION", "1.0.0")
     timestamp = datetime.now().isoformat()
 
-    # Simulate latency if slow mode is active
     if chaos_state["mode"] == "slow":
         time.sleep(chaos_state["duration"])
 
-    # Randomly trigger failures if error mode is active
     if chaos_state["mode"] == "error":
         if random.random() < chaos_state["rate"]:
             return jsonify({"error": "chaos error occurred"}), 500
@@ -39,7 +89,6 @@ def home():
         "timestamp": timestamp
     })
 
-    # Add identifying header for canary deployments
     if mode == "canary":
         response.headers["X-Mode"] = "canary"
 
@@ -51,11 +100,9 @@ def healthz():
     mode = os.getenv("MODE", "stable")
     uptime = int(time.time() - start_time)
 
-    # Health check reflects current chaos latency
     if chaos_state["mode"] == "slow":
         time.sleep(chaos_state["duration"])
 
-    # Health check reflects current chaos error rate
     if chaos_state["mode"] == "error":
         if random.random() < chaos_state["rate"]:
             return jsonify({"error": "chaos error occurred"}), 500
@@ -72,11 +119,40 @@ def healthz():
     return response
 
 
+@app.route("/metrics")
+def metrics():
+    data = generate_latest()
+    return app.response_class(data, mimetype=CONTENT_TYPE_LATEST)
+
+
+
+# Infrastructure metrics endpoint
+
+@app.route("/infra")
+def infra():
+    disk_free = shutil.disk_usage("/").free / (1024**3)
+    cpu_load = os.getloadavg()[0]
+
+    return jsonify({
+        "disk_free_gb": round(disk_free, 2),
+        "cpu_load": round(cpu_load, 2)
+    })
+
+
+# Chaos status endpoint
+
+@app.route("/chaos/status")
+def chaos_status():
+    return jsonify({
+        "mode": chaos_state["mode"] or "off"
+    })
+
+
+# Chaos control endpoint (canary only)
 @app.route("/chaos", methods=["POST"])
 def chaos():
     mode = os.getenv("MODE", "stable")
 
-    # Restrict chaos controls to canary environment only
     if mode != "canary":
         return jsonify({"error": "Chaos mode is only available in canary"}), 403
 
@@ -88,19 +164,16 @@ def chaos():
     global chaos_state
     chaos_mode = data["mode"]
 
-    # Configure latency injection
     if chaos_mode == "slow":
         chaos_state["mode"] = "slow"
         chaos_state["duration"] = int(data.get("duration", 1))
         return jsonify({"status": "slow mode activated"})
 
-    # Configure error rate injection
     elif chaos_mode == "error":
         chaos_state["mode"] = "error"
         chaos_state["rate"] = float(data.get("rate", 0.5))
         return jsonify({"status": "error mode activated"})
 
-    # Reset to normal operation
     elif chaos_mode == "recover":
         chaos_state["mode"] = None
         chaos_state["duration"] = 0
@@ -112,6 +185,5 @@ def chaos():
 
 
 if __name__ == "__main__":
-    # Start server on configurable port
     port = int(os.getenv("APP_PORT", 3000))
     app.run(host="0.0.0.0", port=port)

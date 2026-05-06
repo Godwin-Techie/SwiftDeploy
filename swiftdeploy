@@ -7,11 +7,13 @@ from cli.commands.up import run_up
 from cli.commands.down import run_down
 from cli.commands.promote import run_promote
 from cli.commands.chaos import run_chaos
+from cli.commands.status import run_status
+from cli.commands.audit import run_audit
 
 def main():
     if len(sys.argv) < 2:
         print("Usage: swiftdeploy <command>")
-        print("Commands: init, validate, deploy, teardown, promote, chaos")
+        print("Commands: init, validate, deploy, teardown, promote, chaos, status")
         return
 
     command = sys.argv[1]
@@ -26,6 +28,10 @@ def main():
         run_down()
     elif command == "promote":
         run_promote()
+    elif command == "status":
+        run_status()
+    elif command == "audit":
+        run_audit()
     else:
         print(f"Unknown command: {command}")
         print("Available commands: init, validate, deploy, teardown, promote,")

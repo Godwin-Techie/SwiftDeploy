@@ -25,6 +25,14 @@ def main():
         from cli.commands.up import run_up
         run_up()
 
+    elif command == "status":
+        from cli.commands.status import run_status
+        run_status()
+
+    elif command == "audit":
+        from cli.commands.audit import run_audit
+        run_audit()
+
     # Route to infrastructure removal and cleanup
     elif command == "teardown":
         from cli.commands.down import run_down

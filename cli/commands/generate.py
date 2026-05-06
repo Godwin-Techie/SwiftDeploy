@@ -1,5 +1,6 @@
 from cli.utils.loader import load_manifest
 from cli.utils.renderer import render_template
+from cli.utils.policy import generate_policy_data_files
 import os
 import sys
 
@@ -9,6 +10,13 @@ def run_generate():
 
     # Import data from the manifest file
     manifest = load_manifest()
+
+    # Generate policy JSON files
+    try:
+        generate_policy_data_files(manifest)
+    except Exception as e:
+        print(f"Error generating policy data files: {e}")
+        sys.exit(1)
 
     # Map manifest data to the template context object
     context = {
@@ -42,4 +50,4 @@ def run_generate():
         print(f"Error generating nginx.conf: {e}")
         sys.exit(1)
 
-    print("congratulations! docker-compose.yml and nginx.conf generated successfully, you're good to go!")
+    print("congratulations! docker-compose.yml, nginx.conf, and policy files generated successfully, you're good to go!")
